@@ -179,17 +179,40 @@ else
 fi
 
 ###############################################################################
-# 3. Bind project-level roles (idempotent — gcloud add-iam-policy-binding
-#    is no-op when binding already exists)
+# 3. Bind roles (idempotent — gcloud add-iam-policy-binding is no-op when
+#    the binding already exists).
+#
+# Role attachability (verified against GCP IAM matrix, May 2026):
+#   roles/viewer                    -> project / folder / org
+#   roles/iam.securityReviewer      -> project / folder / org
+#   roles/securitycenter.adminViewer-> project / folder / org
+#   roles/billing.viewer            -> BILLING ACCOUNT or ORG only.
+#                                       NOT attachable at project scope —
+#                                       gcloud rejects with INVALID_ARGUMENT
+#                                       "Role roles/billing.viewer is not
+#                                       supported for this resource".
+#
+# Wiz/Orca/Prisma behavior (industry baseline):
+#   - Project-scope ("Quick Connect"): bind project-attachable roles.
+#     Billing data is best-effort — surfaced as a warning telling the
+#     customer to add `roles/billing.viewer` at org or billing-account
+#     scope if they want FinOps signals. CSPM/CIEM/Asset still work.
+#   - Org-scope ("Organization Connect", DRAX_ORG_ID set): bind
+#     `roles/billing.viewer` at org scope so it works.
+#
+# We treat billing.viewer as a SOFT optional in single-project mode.
 ###############################################################################
-ROLES=(
+PROJECT_SCOPED_ROLES=(
     "roles/viewer"
     "roles/iam.securityReviewer"
-    "roles/billing.viewer"
     "roles/securitycenter.adminViewer"
 )
-for role in "${ROLES[@]}"; do
-    log "Binding $role..."
+ORG_OR_BILLING_SCOPED_ROLES=(
+    "roles/billing.viewer"
+)
+
+for role in "${PROJECT_SCOPED_ROLES[@]}"; do
+    log "Binding $role at project scope..."
     gcloud projects add-iam-policy-binding "$PROJECT_ID" \
         --member="serviceAccount:$SA_EMAIL" \
         --role="$role" \
@@ -197,16 +220,41 @@ for role in "${ROLES[@]}"; do
         --quiet >/dev/null
 done
 
-# Optional: organization-scope binding (covers all projects under the org).
 if [[ -n "${DRAX_ORG_ID:-}" ]]; then
+    # Org-scope path covers ALL roles (project + org-only).
     log "Binding organization-scope roles (org $DRAX_ORG_ID)..."
-    for role in "${ROLES[@]}"; do
+    for role in "${PROJECT_SCOPED_ROLES[@]}" "${ORG_OR_BILLING_SCOPED_ROLES[@]}"; do
+        log "  Org bind: $role"
         gcloud organizations add-iam-policy-binding "$DRAX_ORG_ID" \
             --member="serviceAccount:$SA_EMAIL" \
             --role="$role" \
             --condition=None \
             --quiet >/dev/null
     done
+elif [[ -n "${DRAX_BILLING_ACCOUNT_ID:-}" ]]; then
+    # Billing-account-scope path: just the billing role(s). Customers who
+    # don't want full org binding but still want FinOps signals can supply
+    # DRAX_BILLING_ACCOUNT_ID instead.
+    log "Binding billing-account-scope roles (acct $DRAX_BILLING_ACCOUNT_ID)..."
+    for role in "${ORG_OR_BILLING_SCOPED_ROLES[@]}"; do
+        log "  Billing bind: $role"
+        gcloud beta billing accounts add-iam-policy-binding \
+            "$DRAX_BILLING_ACCOUNT_ID" \
+            --member="serviceAccount:$SA_EMAIL" \
+            --role="$role" \
+            --condition=None \
+            --quiet >/dev/null \
+            || log "  WARN: could not bind $role on billing account (need Billing Account Administrator)."
+    done
+else
+    # Single-project Quick Connect: emit a clear note rather than a hard
+    # error, so the customer knows FinOps will be empty until they bind
+    # billing.viewer at org or billing-account scope. CSPM still proceeds.
+    log "NOTE: org/billing scope not provided — skipping ${ORG_OR_BILLING_SCOPED_ROLES[*]}."
+    log "      FinOps / cost data will be unavailable until you bind"
+    log "      ${ORG_OR_BILLING_SCOPED_ROLES[*]} at organization OR billing"
+    log "      account scope for $SA_EMAIL. Re-run with DRAX_ORG_ID=<id> or"
+    log "      DRAX_BILLING_ACCOUNT_ID=<id> to bind automatically."
 fi
 
 ###############################################################################
