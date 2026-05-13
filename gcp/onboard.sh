@@ -63,9 +63,70 @@ DRAX_TEMPLATE_VER="${DRAX_TEMPLATE_VER:-1.1.0}"
 [[ "$DRAX_EXTERNAL_ID" =~ ^drax-[a-z0-9-]+-gcp-[a-f0-9]{16}$ ]] \
     || err "DRAX_EXTERNAL_ID format invalid."
 
+###############################################################################
+# Project resolution — Cloud Shell starts with NO default project. Force-asking
+# the customer to run `gcloud config set project <ID>` before our script is
+# friction Wiz/Orca/Prisma do not have. Resolution order:
+#   1. DRAX_PROJECT_ID env (explicit override).
+#   2. `gcloud config get-value project` (existing user default).
+#   3. List projects the active gcloud principal can see; if exactly one,
+#      adopt it (also persist via `gcloud config set project` so re-runs are
+#      instant). If multiple, prompt with a numbered picker — silent failure
+#      is worse than one prompt for multi-project orgs.
+#   4. Hard error only if zero projects visible (auth issue, not UX issue).
+###############################################################################
 PROJECT_ID="${DRAX_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+if [[ -z "$PROJECT_ID" || "$PROJECT_ID" == "(unset)" ]]; then
+    log "No default GCP project configured — discovering accessible projects..."
+    # `gcloud projects list` returns ACTIVE projects only by default; that is
+    # what we want (deleted/pending projects can't be onboarded).
+    mapfile -t _DRAX_PROJECTS < <(
+        gcloud projects list \
+            --filter='lifecycleState:ACTIVE' \
+            --format='value(projectId)' 2>/dev/null \
+            | awk 'NF'
+    )
+    case "${#_DRAX_PROJECTS[@]}" in
+        0)
+            err "No GCP projects visible to $(gcloud config get-value account 2>/dev/null || echo 'this account'). Sign in with an account that has at least Viewer on the target project, or set DRAX_PROJECT_ID."
+            ;;
+        1)
+            PROJECT_ID="${_DRAX_PROJECTS[0]}"
+            log "Found single accessible project: $PROJECT_ID — auto-selecting."
+            gcloud config set project "$PROJECT_ID" --quiet >/dev/null 2>&1 || true
+            ;;
+        *)
+            # Multi-project picker. Honors non-interactive shells too: if stdin
+            # is not a TTY (CI / piped), we refuse to guess and bail out with
+            # a clear instruction instead of silently picking [0].
+            if [[ ! -t 0 ]]; then
+                err "Multiple GCP projects visible (${#_DRAX_PROJECTS[@]}). Set DRAX_PROJECT_ID or run \`gcloud config set project <ID>\` first. Visible: ${_DRAX_PROJECTS[*]}"
+            fi
+            echo "[drax] Multiple GCP projects visible. Pick the one to onboard:" >&2
+            # NOTE: `local` is invalid outside a function under `set -u`. Use a
+            # plain shell variable here.
+            _DRAX_I=1
+            for _p in "${_DRAX_PROJECTS[@]}"; do
+                echo "  [$_DRAX_I] $_p" >&2
+                _DRAX_I=$((_DRAX_I + 1))
+            done
+            _DRAX_CHOICE=""
+            while [[ -z "$_DRAX_CHOICE" ]]; do
+                read -r -p "[drax] Project number (1-${#_DRAX_PROJECTS[@]}): " _DRAX_CHOICE </dev/tty || true
+                if ! [[ "$_DRAX_CHOICE" =~ ^[0-9]+$ ]] \
+                    || (( _DRAX_CHOICE < 1 || _DRAX_CHOICE > ${#_DRAX_PROJECTS[@]} )); then
+                    echo "[drax] Invalid choice — enter 1-${#_DRAX_PROJECTS[@]}." >&2
+                    _DRAX_CHOICE=""
+                fi
+            done
+            PROJECT_ID="${_DRAX_PROJECTS[$((_DRAX_CHOICE - 1))]}"
+            log "Selected project: $PROJECT_ID"
+            gcloud config set project "$PROJECT_ID" --quiet >/dev/null 2>&1 || true
+            ;;
+    esac
+fi
 [[ -n "$PROJECT_ID" && "$PROJECT_ID" != "(unset)" ]] \
-    || err "No GCP project. Run \`gcloud config set project <ID>\` or set DRAX_PROJECT_ID."
+    || err "No GCP project resolved (unexpected). Set DRAX_PROJECT_ID and retry."
 
 EXT_SHORT="${DRAX_EXTERNAL_ID##*-}"          # last 16 hex (audit only)
 # Service account ID derives from the tenant slug, NOT the ExternalId hex.
