@@ -56,9 +56,9 @@ DRAX_EXTERNAL_ID="${DRAX_EXTERNAL_ID:-}"
 DRAX_WEBHOOK_URL="${DRAX_WEBHOOK_URL:-}"
 DRAX_TEMPLATE_VER="${DRAX_TEMPLATE_VER:-1.1.0}"
 
-[[ -n "$DRAX_TENANT_ID"   ]] || err "DRAX_TENANT_ID not set."
-[[ -n "$DRAX_EXTERNAL_ID" ]] || err "DRAX_EXTERNAL_ID not set."
-[[ -n "$DRAX_WEBHOOK_URL" ]] || err "DRAX_WEBHOOK_URL not set."
+[[ -n "$DRAX_TENANT_ID"   ]] || err "DRAX_TENANT_ID not set. In Drax: Settings → GCP onboarding → copy the export ... block into this shell, then run bash onboard.sh again."
+[[ -n "$DRAX_EXTERNAL_ID" ]] || err "DRAX_EXTERNAL_ID not set. Same: paste the export block from Drax GCP onboarding, then re-run."
+[[ -n "$DRAX_WEBHOOK_URL" ]] || err "DRAX_WEBHOOK_URL not set. Same: paste the export block from Drax GCP onboarding, then re-run."
 
 [[ "$DRAX_EXTERNAL_ID" =~ ^drax-[a-z0-9-]+-gcp-[a-f0-9]{16}$ ]] \
     || err "DRAX_EXTERNAL_ID format invalid."
@@ -206,6 +206,15 @@ PROJECT_SCOPED_ROLES=(
     "roles/viewer"
     "roles/iam.securityReviewer"
     "roles/securitycenter.adminViewer"
+    # Required by Prowler GCP. Without it, Prowler cannot list enabled
+    # APIs on the target project and aborts during config loading
+    # (exit code 3). Documented at:
+    #   https://docs.prowler.com/user-guide/providers/gcp/authentication
+    #   ("Service Usage Consumer (roles/serviceusage.serviceUsageConsumer)
+    #    IAM Role – Required for resource scanning.")
+    # Verified against upstream prowler/providers/gcp/gcp_provider.py
+    # which queries serviceusage to discover scannable services.
+    "roles/serviceusage.serviceUsageConsumer"
 )
 ORG_OR_BILLING_SCOPED_ROLES=(
     "roles/billing.viewer"
