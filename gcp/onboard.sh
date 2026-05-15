@@ -161,6 +161,7 @@ gcloud services enable \
     securitycenter.googleapis.com \
     logging.googleapis.com \
     monitoring.googleapis.com \
+    serviceusage.googleapis.com \
     --project="$PROJECT_ID" \
     --quiet
 
