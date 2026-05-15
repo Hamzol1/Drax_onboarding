@@ -16,12 +16,20 @@
 #        drax-readonly-{ext_short}  (display name)
 #   3. Issues a fresh client secret with a 24-month expiry (rotated by the
 #      Drax credential health job at 22 months).
-#   4. Assigns the four read-only RBAC roles at subscription scope:
+#   4. Registers required Azure Resource Providers (Microsoft.Security,
+#      Microsoft.PolicyInsights, Microsoft.Insights) — idempotent. Without
+#      these registered, Prowler's Defender / policy / monitoring CIS checks
+#      return 404 "provider not registered" and skip silently.
+#   5. Assigns the four read-only RBAC roles at subscription scope:
 #        - Reader                              (acdd72a7-...)
 #        - Cost Management Reader              (72fafb9e-...)
 #        - Security Reader                     (39bc4728-...)
 #        - Storage Blob Data Reader            (2a2b9908-...)
-#   5. POSTs the credentials (HMAC-signed with the Drax ExternalId) to Drax's
+#   6. Assigns the Azure AD "Global Reader" role at tenant scope via Microsoft
+#      Graph. Required for Prowler CIS §1.x checks (MFA, Conditional Access,
+#      password policies). Graceful skip with warning if caller lacks
+#      Privileged Role Administrator / Global Administrator. Idempotent.
+#   7. POSTs the credentials (HMAC-signed with the Drax ExternalId) to Drax's
 #      registration webhook. Customer never copy/pastes anything.
 #
 # Required env (Cloud Shell deep link supplies these):
@@ -88,7 +96,28 @@ log "Drax tenant:    $DRAX_TENANT_ID"
 log "Template ver:   $DRAX_TEMPLATE_VER"
 
 ###############################################################################
-# 1. Create or reuse AAD app + SP. We do NOT pass `--skip-assignment` —
+# 1. Register required Azure Resource Providers (idempotent).
+#    Without these registered in the subscription, Prowler's CIS Azure checks
+#    for Microsoft Defender, Policy compliance, and monitoring return
+#    "NoRegisteredProviderFound" / 404 and skip silently — identical in impact
+#    to the GCP serviceusage.googleapis.com disabled problem.
+#    `az provider register --wait` is idempotent (no-op if already registered).
+###############################################################################
+log "Registering required Azure resource providers (idempotent)..."
+for ns in \
+    Microsoft.Security \
+    Microsoft.PolicyInsights \
+    Microsoft.Insights; do
+    az provider register \
+        --namespace "$ns" \
+        --subscription "$SUBSCRIPTION_ID" \
+        --wait \
+        --output none 2>/dev/null \
+        || log "  WARN: could not register $ns (checks using this provider may be partial)"
+done
+
+###############################################################################
+# 2. Create or reuse AAD app + SP. We do NOT pass `--skip-assignment` —
 #    it was REMOVED in Azure CLI 2.43+ (Nov 2022) and now errors out.
 #    The default behaviour since 2.43 is "no implicit role assignment", so
 #    omission gives us the same outcome we want (explicit RBAC step #2).
@@ -135,8 +164,8 @@ done
 [[ -n "$SP_OBJECT_ID" ]] || err "SP object id not visible after 60s — AAD replication delay?"
 
 ###############################################################################
-# 2. Assign read-only roles. Subscription scope is the default; org scope is
-#    optional (DRAX_MGMT_GROUP_ID).
+# 3. Assign read-only RBAC roles. Subscription scope is the default; org scope
+#    is optional (DRAX_MGMT_GROUP_ID).
 ###############################################################################
 ROLES=(
     "acdd72a7-3385-48ef-bd42-f606fba81ae7"   # Reader
@@ -162,7 +191,27 @@ for role_id in "${ROLES[@]}"; do
 done
 
 ###############################################################################
-# 3. Build payload + HMAC, POST to Drax webhook.
+# 4. Assign Azure AD "Global Reader" role at tenant scope (idempotent).
+#    Required for Prowler CIS Azure §1.x checks: MFA enforcement, Conditional
+#    Access policies, password policies, guest user settings.
+#    Role def GUID f2ef992c-3afb-46b9-b7cf-a126ee74c451 is stable / built-in.
+#    Requires caller to have Privileged Role Administrator or Global Admin in
+#    the AAD tenant — graceful skip with warning if missing. If the role is
+#    already assigned the Graph API returns 400 "already assigned", which we
+#    also suppress (idempotent).
+###############################################################################
+GLOBAL_READER_ROLE_ID="f2ef992c-3afb-46b9-b7cf-a126ee74c451"
+log "Assigning Azure AD 'Global Reader' role at tenant scope (CIS §1.x checks)..."
+az rest \
+    --method POST \
+    --uri "https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments" \
+    --headers "Content-Type=application/json" \
+    --body "{\"@odata.type\":\"#microsoft.graph.unifiedRoleAssignment\",\"roleDefinitionId\":\"$GLOBAL_READER_ROLE_ID\",\"principalId\":\"$SP_OBJECT_ID\",\"directoryScopeId\":\"/\"}" \
+    --output none 2>/dev/null \
+    || log "  NOTE: Could not assign Global Reader AAD role (need Privileged Role Administrator or Global Admin — or already assigned). MFA / Conditional Access CIS checks may be partial."
+
+###############################################################################
+# 5. Build payload + HMAC, POST to Drax webhook.
 ###############################################################################
 PAYLOAD=$(jq -nc \
     --arg p azure \
