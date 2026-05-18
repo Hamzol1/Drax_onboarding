@@ -211,7 +211,90 @@ az rest \
     || log "  NOTE: Could not assign Global Reader AAD role (need Privileged Role Administrator or Global Admin — or already assigned). MFA / Conditional Access CIS checks may be partial."
 
 ###############################################################################
-# 5. Build payload + HMAC, POST to Drax webhook.
+# 5. Grant Microsoft Graph application permissions (admin consent) — idempotent.
+#    These are APPLICATION permissions (not delegated), required for server-to-
+#    server CIEM discovery with no signed-in user. Cannot be set via RBAC;
+#    must be granted via Graph appRoleAssignments.
+#
+#    Permissions granted:
+#      AuditLog.Read.All     b0afded3-3588-46d8-8b3d-9842eff778da
+#        → signInActivity on users (dormant account detection)
+#      User.Read.All         df021288-bdef-4463-88db-98f22de89214
+#        → full user list + profile data (CIEM identity discovery)
+#      Group.Read.All        5b567255-7703-4780-807c-7be8301ae99b
+#        → Entra group discovery
+#      Directory.Read.All    7ab1d382-f21e-4acd-a863-ba3e13f7da61
+#        → service principals, app registrations
+#
+#    Microsoft Graph resource SP object id is stable across all tenants:
+#      00000003-0000-0000-c000-000000000000 (appId)
+#    We resolve its objectId dynamically to avoid hard-coding it.
+#
+#    Requires the caller to have "Cloud Application Administrator" or
+#    "Global Administrator" in the AAD tenant. Graceful skip with warning
+#    if the permission is already assigned (Graph returns 409) or caller
+#    lacks privilege (Graph returns 403). Idempotent.
+###############################################################################
+log "Resolving Microsoft Graph SP object id..."
+GRAPH_SP_OID=$(az ad sp show --id "00000003-0000-0000-c000-000000000000" --query id -o tsv 2>/dev/null || true)
+
+if [[ -z "$GRAPH_SP_OID" || "$GRAPH_SP_OID" == "null" ]]; then
+    log "  WARN: Could not resolve Microsoft Graph SP object id — skipping Graph permission grants."
+    log "  IMPACT: signInActivity (dormant detection), full user/group/SP CIEM discovery may be partial."
+else
+    log "Microsoft Graph SP: $GRAPH_SP_OID"
+
+    # appRole IDs — application permissions, stable GUIDs verified against
+    # https://learn.microsoft.com/en-us/graph/permissions-reference
+    # and cross-referenced against Prisma Cloud Terraform onboarding template.
+    GRAPH_APP_ROLES=(
+        "b0afded3-3588-46d8-8b3d-9842eff778da"  # AuditLog.Read.All        — signInActivity / dormant detection
+        "df021288-bdef-4463-88db-98f22de89214"  # User.Read.All             — full user CIEM discovery
+        "5b567255-7703-4780-807c-7be8301ae99b"  # Group.Read.All            — Entra group discovery
+        "98830695-27a2-44f7-8c18-0c3ebc9698f6"  # GroupMember.Read.All      — group membership (CIEM overprivilege)
+        "7ab1d382-f21e-4acd-a863-ba3e13f7da61"  # Directory.Read.All        — SP + app registrations
+        "9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30"  # Application.Read.All      — app registration detail
+        "246dd0d5-5bd0-4def-940b-0421030a5b68"  # Policy.Read.All           — Conditional Access / auth policies
+    )
+    GRAPH_ROLE_NAMES=(
+        "AuditLog.Read.All"
+        "User.Read.All"
+        "Group.Read.All"
+        "GroupMember.Read.All"
+        "Directory.Read.All"
+        "Application.Read.All"
+        "Policy.Read.All"
+    )
+
+    for i in "${!GRAPH_APP_ROLES[@]}"; do
+        role_id="${GRAPH_APP_ROLES[$i]}"
+        role_name="${GRAPH_ROLE_NAMES[$i]}"
+        log "  Granting Graph permission: $role_name ($role_id)..."
+        GRANT_RESP=$(az rest \
+            --method POST \
+            --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$SP_OBJECT_ID/appRoleAssignments" \
+            --headers "Content-Type=application/json" \
+            --body "{\"principalId\":\"$SP_OBJECT_ID\",\"resourceId\":\"$GRAPH_SP_OID\",\"appRoleId\":\"$role_id\"}" \
+            -o json 2>&1 || true)
+        # 409 = already assigned (idempotent), anything else is a real error
+        if echo "$GRANT_RESP" | grep -q '"error"'; then
+            ERR_CODE=$(echo "$GRANT_RESP" | jq -r '.error.code // empty' 2>/dev/null || true)
+            if [[ "$ERR_CODE" == "Permission_Duplicate" || "$ERR_CODE" == "Duplicate" ]]; then
+                log "    $role_name already assigned — OK."
+            else
+                log "    WARN: Could not grant $role_name: $ERR_CODE. CIS/CIEM checks using this perm may be partial."
+            fi
+        else
+            log "    $role_name granted."
+        fi
+    done
+
+    log "Note: Graph application permissions require admin consent. If the SP was just"
+    log "created, consent propagation may take up to 5 minutes."
+fi
+
+###############################################################################
+# 6. Build payload + HMAC, POST to Drax webhook.
 ###############################################################################
 PAYLOAD=$(jq -nc \
     --arg p azure \
