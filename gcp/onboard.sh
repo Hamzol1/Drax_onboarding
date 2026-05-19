@@ -216,6 +216,9 @@ PROJECT_SCOPED_ROLES=(
     # Verified against upstream prowler/providers/gcp/gcp_provider.py
     # which queries serviceusage to discover scannable services.
     "roles/serviceusage.serviceUsageConsumer"
+    # BigQuery billing export read (FinOps cost sync queries export table)
+    "roles/bigquery.jobUser"
+    "roles/bigquery.dataViewer"
 )
 ORG_OR_BILLING_SCOPED_ROLES=(
     "roles/billing.viewer"
@@ -303,6 +306,43 @@ gcloud iam service-accounts keys create "$KEY_FILE" \
     --quiet
 
 ###############################################################################
+# 4b. Discover BigQuery billing export AS THE SA (same identity Drax uses).
+#     Uses SA key file — not caller gcloud — so table must be readable by SA.
+###############################################################################
+_discover_billing_export_table_as_sa() {
+    local proj="$1"
+    local key_file="$2"
+    DRAX_KEY_FILE="$key_file" DRAX_PROJECT_ID="$proj" python3 - <<'PYEOF'
+import os, sys
+try:
+    from google.cloud import bigquery
+    from google.oauth2 import service_account
+except ImportError:
+    sys.exit(1)
+key_path = os.environ["DRAX_KEY_FILE"]
+proj = os.environ["DRAX_PROJECT_ID"]
+creds = service_account.Credentials.from_service_account_file(key_path)
+client = bigquery.Client(credentials=creds, project=proj)
+prefixes = ("gcp_billing_export_v1", "gcp_billing_export_resource_v1")
+for ds in client.list_datasets(project=proj):
+    for tbl in client.list_tables(f"{proj}.{ds.dataset_id}"):
+        if tbl.table_id.startswith(prefixes):
+            print(f"{proj}.{ds.dataset_id}.{tbl.table_id}")
+            sys.exit(0)
+sys.exit(1)
+PYEOF
+}
+
+DRAX_BILLING_EXPORT_TABLE=""
+if _bt=$(_discover_billing_export_table_as_sa "$PROJECT_ID" "$KEY_FILE"); then
+    DRAX_BILLING_EXPORT_TABLE="$_bt"
+    log "Found BigQuery billing export table (SA-visible): $DRAX_BILLING_EXPORT_TABLE"
+else
+    log "NOTE: No billing export table visible to $SA_EMAIL in $PROJECT_ID."
+    log "      Enable Billing → BigQuery export, or set project.dataset.table in Drax Cost & Usage → Settings."
+fi
+
+###############################################################################
 # 5. Build payload + HMAC, POST to Drax webhook.
 #    Payload schema mirrors src/api/cloud_onboarding_webhook.py.
 #
@@ -320,6 +360,7 @@ PAYLOAD=$(
     DRAX_PROJECT_ID="$PROJECT_ID" \
     DRAX_SA_EMAIL="$SA_EMAIL" \
     DRAX_ORG_ID="${DRAX_ORG_ID:-}" \
+    DRAX_BILLING_EXPORT_TABLE="${DRAX_BILLING_EXPORT_TABLE:-}" \
     python3 - <<'PYEOF'
 import json, os
 with open(os.environ["DRAX_KEY_FILE"]) as f:
@@ -334,6 +375,7 @@ print(json.dumps({
     "sa_email": os.environ["DRAX_SA_EMAIL"],
     "sa_key_json": key,
     "organization_id": os.environ.get("DRAX_ORG_ID", ""),
+    "billing_export_table": os.environ.get("DRAX_BILLING_EXPORT_TABLE", ""),
 }, separators=(",", ":")))
 PYEOF
 )
