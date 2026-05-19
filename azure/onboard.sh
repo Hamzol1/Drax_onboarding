@@ -201,7 +201,7 @@ done
 #    also suppress (idempotent).
 ###############################################################################
 GLOBAL_READER_ROLE_ID="f2ef992c-3afb-46b9-b7cf-a126ee74c451"
-log "Assigning Azure AD 'Global Reader' role at tenant scope (CIS §1.x checks)..."
+log "Assigning Azure AD 'Global Reader' role..."
 az rest \
     --method POST \
     --uri "https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments" \
