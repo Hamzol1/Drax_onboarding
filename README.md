@@ -17,6 +17,9 @@ their cloud account and registers it with Drax.
 
 ```text
 .
+├── docs/
+│   └── linkedin-poster/
+│       └── privacy-policy.html   # Public privacy policy for LinkedIn Poster (GitHub Pages)
 ├── gcp/
 │   ├── onboard.sh    # Cloud Shell entry point (GCP)
 │   └── TUTORIAL.md   # Step-by-step guide rendered in the Cloud Shell tutorial pane
@@ -24,6 +27,14 @@ their cloud account and registers it with Drax.
     ├── onboard.sh    # Cloud Shell entry point (Azure)
     └── TUTORIAL.md   # Step-by-step guide rendered in the Cloud Shell tutorial pane
 ```
+
+## LinkedIn Poster privacy policy
+
+The **LinkedIn Poster** Windows app (Drax Security) uses this public URL for the LinkedIn Developer Portal **Privacy policy URL** field:
+
+**https://hamzol1.github.io/Drax_onboarding/linkedin-poster/privacy-policy.html**
+
+Source: [`docs/linkedin-poster/privacy-policy.html`](docs/linkedin-poster/privacy-policy.html). Published via GitHub Pages on push to `main`.
 
 ## What the scripts do
 
