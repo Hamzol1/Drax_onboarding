@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LinkedIn Poster — Privacy Policy | Drax Security</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+      color: #1a1a1a;
+      background: #fff;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { color: #e8e8e8; background: #121212; }
+      a { color: #6cb6ff; }
+      th, td { border-color: #444; }
+    }
+    h1, h2 { line-height: 1.25; }
+    h1 { font-size: 1.75rem; margin-bottom: 0.25rem; }
+    .meta { opacity: 0.75; font-size: 0.95rem; margin-bottom: 2rem; }
+    h2 { font-size: 1.2rem; margin-top: 2rem; border-bottom: 1px solid #ccc; padding-bottom: 0.35rem; }
+    ul { padding-left: 1.25rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.95rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem 0.65rem; text-align: left; vertical-align: top; }
+    th { background: rgba(0,0,0,0.04); }
+    footer { margin-top: 3rem; font-size: 0.9rem; opacity: 0.8; }
+    a { color: #0a66c2; }
+  </style>
+</head>
+<body>
+  <h1>LinkedIn Poster — Privacy Policy</h1>
+  <p class="meta">
+    <strong>Drax Security</strong> · Effective date: <time datetime="2026-06-17">17 June 2026</time> ·
+    Application: <em>LinkedIn Poster</em> (Windows desktop)
+  </p>
+
+  <p>
+    This Privacy Policy describes how <strong>Drax Security</strong> (“we”, “us”, “our”) handles information
+    when you use the <strong>LinkedIn Poster</strong> desktop application (“App”). The App helps you compose,
+    schedule, and publish content to LinkedIn using LinkedIn’s official APIs after you authorize access.
+  </p>
+  <p>
+    By installing or using the App, you agree to this Privacy Policy. If you do not agree, do not use the App.
+  </p>
+
+  <h2>1. Who we are</h2>
+  <p>
+    <strong>Data controller:</strong> Drax Security<br />
+    <strong>LinkedIn Company Page associated with the developer app:</strong> Drax Security<br />
+    <strong>Privacy contact:</strong> <a href="mailto:privacy@drax.solutions">privacy@drax.solutions</a><br />
+    <strong>Security contact:</strong> <a href="mailto:security@drax-security.com">security@drax-security.com</a>
+  </p>
+
+  <h2>2. Summary</h2>
+  <ul>
+    <li>The App is <strong>local-first</strong>: your posts, drafts, media, and credentials are stored on <strong>your Windows PC</strong>.</li>
+    <li>We do <strong>not</strong> operate a Drax-hosted backend that receives your LinkedIn content or tokens.</li>
+    <li>The App communicates with <strong>LinkedIn</strong> (and only as needed with <strong>GitHub</strong> for optional updates and FFmpeg bootstrap) to perform functions you request.</li>
+    <li>We do <strong>not</strong> sell your personal information.</li>
+  </ul>
+
+  <h2>3. Information we process</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th>Examples</th>
+        <th>Where stored</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>LinkedIn OAuth tokens</td>
+        <td>Access token, refresh token, expiry, granted scopes</td>
+        <td>Local SQLite database on your PC, encrypted with Windows DPAPI</td>
+        <td>Authenticate API calls to LinkedIn on your behalf</td>
+      </tr>
+      <tr>
+        <td>LinkedIn developer credentials</td>
+        <td>Client ID, Client Secret you enter during setup</td>
+        <td>Local <code>vault.json</code> on your PC, encrypted with Windows DPAPI</td>
+        <td>Complete OAuth authorization with your LinkedIn developer application</td>
+      </tr>
+      <tr>
+        <td>LinkedIn account profile data</td>
+        <td>Member URN, display name, organization pages you administer, granted scopes</td>
+        <td>Local SQLite database</td>
+        <td>Let you choose posting author and validate permissions</td>
+      </tr>
+      <tr>
+        <td>Content you create</td>
+        <td>Post text, mentions, polls, article URLs, scheduled times, drafts</td>
+        <td>Local SQLite database</td>
+        <td>Compose, preview, schedule, and publish posts</td>
+      </tr>
+      <tr>
+        <td>Media attachments</td>
+        <td>Images, videos, documents, captions, alt text, thumbnails</td>
+        <td>Local folder under <code>%LOCALAPPDATA%\LinkedInPoster\media</code></td>
+        <td>Attach media to posts and upload to LinkedIn when you publish</td>
+      </tr>
+      <tr>
+        <td>Operational logs</td>
+        <td>Startup traces, error logs, optional crash diagnostics</td>
+        <td>Local folder <code>%LOCALAPPDATA%\LinkedInPoster\logs</code></td>
+        <td>Troubleshooting and reliability on your device</td>
+      </tr>
+      <tr>
+        <td>API audit metadata</td>
+        <td>Request URLs, HTTP status, timestamps, quota counters</td>
+        <td>Local SQLite database</td>
+        <td>Rate-limit awareness and publish diagnostics</td>
+      </tr>
+      <tr>
+        <td>App preferences</td>
+        <td>Timezone, onboarding state, UI settings</td>
+        <td>Local SQLite database</td>
+        <td>Remember your configuration</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>4. Information we send to third parties</h2>
+  <h3>4.1 LinkedIn (required for core functionality)</h3>
+  <p>When you connect an account or publish content, the App sends data to LinkedIn’s APIs, including:</p>
+  <ul>
+    <li>OAuth authorization and token refresh requests</li>
+    <li>Post content, visibility settings, mentions, and media you choose to publish</li>
+    <li>Profile and organization lookups needed for authoring (e.g., people/org search when enabled)</li>
+  </ul>
+  <p>
+    LinkedIn’s processing is governed by
+    <a href="https://www.linkedin.com/legal/privacy-policy" rel="noopener noreferrer">LinkedIn’s Privacy Policy</a>
+    and
+    <a href="https://www.linkedin.com/legal/l/api-terms-of-use" rel="noopener noreferrer">LinkedIn API Terms of Use</a>.
+    You authorize the App through LinkedIn’s consent screen for scopes such as
+    <code>openid</code>, <code>profile</code>, <code>email</code>, <code>w_member_social</code>, and optionally
+    <code>w_organization_social</code> for organization posting.
+  </p>
+
+  <h3>4.2 GitHub (optional / technical)</h3>
+  <ul>
+    <li><strong>Update checks (optional):</strong> The App may query the GitHub Releases API to notify you of newer versions. No post content or LinkedIn tokens are sent.</li>
+    <li><strong>FFmpeg bootstrap (optional):</strong> On first video-related use, the App may download FFmpeg binaries from a public GitHub release to generate thumbnails locally. Media content is not uploaded to GitHub.</li>
+  </ul>
+
+  <h3>4.3 No Drax cloud collection</h3>
+  <p>
+    The App does <strong>not</strong> transmit your LinkedIn tokens, post bodies, or media to Drax Security servers.
+    Drax Security does not use the App for advertising, profiling, or cross-app tracking.
+  </p>
+
+  <h2>5. Local storage and security</h2>
+  <ul>
+    <li>Application data directory: <code>%LOCALAPPDATA%\LinkedInPoster\</code></li>
+    <li>Sensitive strings (OAuth tokens, client secret) are protected using <strong>Windows DPAPI</strong> tied to your Windows user profile.</li>
+    <li>OAuth redirect for authorization uses a <strong>loopback listener</strong> on <code>http://127.0.0.1</code> on your machine only.</li>
+    <li>You are responsible for securing your Windows account, disk encryption, and backups of your PC.</li>
+  </ul>
+
+  <h2>6. How we use information</h2>
+  <p>We use the information described above solely to:</p>
+  <ul>
+    <li>Provide compose, preview, schedule, and publish features you request</li>
+    <li>Maintain drafts, restore interrupted work, and detect missed scheduled posts on your device</li>
+    <li>Refresh OAuth tokens and surface re-authentication when tokens expire</li>
+    <li>Enforce LinkedIn API quota awareness and show errors when limits are reached</li>
+    <li>Improve stability through local diagnostic logs</li>
+  </ul>
+
+  <h2>7. Legal bases (EEA/UK users)</h2>
+  <p>Where GDPR applies, we process personal data based on:</p>
+  <ul>
+    <li><strong>Performance of a contract / service:</strong> operating the App at your request</li>
+    <li><strong>Legitimate interests:</strong> securing the App, preventing abuse of LinkedIn APIs, and local troubleshooting</li>
+    <li><strong>Consent:</strong> your authorization via LinkedIn OAuth and your choice to install and use the App</li>
+  </ul>
+
+  <h2>8. Retention</h2>
+  <p>
+    Data remains on your device until you delete it or uninstall the App. You may delete individual posts/drafts,
+    disconnect LinkedIn accounts, export backups, or wipe all local application data from Settings.
+    OAuth tokens in backups are exported without secrets; restoring a backup requires re-authentication with LinkedIn.
+  </p>
+
+  <h2>9. Your choices and rights</h2>
+  <p>Depending on your jurisdiction, you may have rights to access, correct, delete, or restrict processing of your personal data.</p>
+  <p><strong>In the App:</strong></p>
+  <ul>
+    <li>Disconnect LinkedIn accounts in Settings</li>
+    <li>Delete posts and drafts in the Posts view</li>
+    <li>Export or import backups (Settings)</li>
+    <li>Wipe all local application data (Settings → data wipe)</li>
+    <li>Uninstall the App and delete <code>%LOCALAPPDATA%\LinkedInPoster\</code></li>
+  </ul>
+  <p>
+    <strong>Contact us</strong> at <a href="mailto:privacy@drax.solutions">privacy@drax.solutions</a> for privacy requests.
+    We will respond within applicable legal timeframes.
+  </p>
+
+  <h2>10. Children</h2>
+  <p>
+    The App is not directed to children under 16 (or the minimum age required in your country). We do not knowingly
+    collect personal information from children.
+  </p>
+
+  <h2>11. International transfers</h2>
+  <p>
+    When you use LinkedIn, your data is processed by LinkedIn according to its policies and infrastructure.
+    Local App data stays on your device unless you choose to back it up to a location you control.
+  </p>
+
+  <h2>12. Changes to this policy</h2>
+  <p>
+    We may update this Privacy Policy. The effective date at the top will change when we do.
+    Material changes will be reflected in App release notes or this hosted document.
+    Continued use after an update constitutes acceptance of the revised policy.
+  </p>
+
+  <h2>13. Contact</h2>
+  <p>
+    <strong>Drax Security — Privacy</strong><br />
+    Email: <a href="mailto:privacy@drax.solutions">privacy@drax.solutions</a><br />
+    Security: <a href="mailto:security@drax-security.com">security@drax-security.com</a>
+  </p>
+
+  <footer>
+    <p>© 2026 Drax Security. LinkedIn Poster.</p>
+    <p>
+      Hosted document:
+      <a href="https://hamzol1.github.io/Drax_onboarding/linkedin-poster/privacy-policy.html">privacy-policy.html</a>
+      · Source:
+      <a href="https://github.com/Hamzol1/Drax_onboarding">Hamzol1/Drax_onboarding</a>
+    </p>
+  </footer>
+</body>
+</html>
