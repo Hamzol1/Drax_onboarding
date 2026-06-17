@@ -32,12 +32,12 @@ their cloud account and registers it with Drax.
 
 The **LinkedIn Poster** Windows app (Drax Security) uses this public URL for the LinkedIn Developer Portal **Privacy policy URL** field:
 
-**https://github.com/Hamzol1/Drax_onboarding/blob/main/PRIVACY-LINKEDIN-POSTER.md**
-
-Rendered HTML (GitHub Pages, after Pages is enabled on the repo):  
 **https://hamzol1.github.io/Drax_onboarding/linkedin-poster/privacy-policy.html**
 
-Sources: [`PRIVACY-LINKEDIN-POSTER.md`](PRIVACY-LINKEDIN-POSTER.md) · [`docs/linkedin-poster/privacy-policy.html`](docs/linkedin-poster/privacy-policy.html)
+Alternate (GitHub-rendered markdown):  
+**https://github.com/Hamzol1/Drax_onboarding/blob/main/PRIVACY-LINKEDIN-POSTER.md**
+
+Sources: [`docs/linkedin-poster/privacy-policy.html`](docs/linkedin-poster/privacy-policy.html) · [`PRIVACY-LINKEDIN-POSTER.md`](PRIVACY-LINKEDIN-POSTER.md)
 
 ## What the scripts do
 
